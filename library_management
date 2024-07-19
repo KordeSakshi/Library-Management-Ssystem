@@ -1,0 +1,180 @@
+Creating tables for the Library Management System
+
+Create table STAR_MEMBERS
+(
+MEMBER_ID Varchar(10) PRIMARY KEY,
+MEMBER_NAME Varchar(30) NOT NULL,
+ADDRESS Varchar(20),
+EMAIL VARCHAR (100) NOT NULL,
+GENDER VARCHAR(6) NOT NULL,
+DATE_REGISTER Date NOT NULL,
+DATE_EXPIRE Date ,
+MEMBERSHIP_STATUS Varchar(15)NOT NULL
+);
+
+Create table STAR_SUPPLIERS_DETAILS
+(
+SUPPLIER_ID Varchar(3) PRIMARY KEY,
+SUPPLIER_NAME Varchar(30) NOT NULL,
+ADDRESS Varchar(50),
+CONTACT bigint(10) NOT NULL, 
+EMAIL Varchar(50) NOT NULL
+);
+
+Create table STAR_FINE_DETAILS
+(
+FINE_RANGE Varchar(3) PRIMARY KEY,
+FINE_AMOUNT decimal(10,2) NOT NULL
+);
+
+Create table STAR_BOOK_DETAILS
+(
+BOOK_ID Varchar(10) PRIMARY KEY, 
+BOOK_TITLE Varchar(150) NOT NULL,
+CATEGORY Varchar(150) NOT NULL,
+AUTHOR Varchar(150) NOT NULL,
+PUBLICATION Varchar(150),
+PUBLISH_DATE Date,
+BOOK_EDITION int(2),
+PRICE decimal(8,2) NOT NULL, 
+RACK_NUM Varchar(3),
+DATE_ARRIVAL Date NOT NULL,  
+SUPPLIER_ID Varchar(3) NOT NULL,
+AVAILABLE_BOOK INT(30),
+TOTAL_COPIES INT(30),
+FOREIGN KEY (SUPPLIER_ID) references STAR_SUPPLIERS_DETAILS(SUPPLIER_ID)
+);
+
+Create table STAR_BOOK_ISSUE
+(
+ISSUE_ID int PRIMARY KEY,
+MEMBER_ID Varchar(10) NOT NULL,
+BOOK_ID Varchar(10) NOT NULL,
+DATE_ISSUE Date NOT NULL,
+DATE_RETURN Date NOT NULL,
+DATE_RETURNED Date NULL,
+FINE_RANGE Varchar(3),
+FOREIGN KEY(MEMBER_ID) References STAR_MEMBERS(MEMBER_ID),
+FOREIGN KEY(BOOK_ID) References STAR_BOOK_DETAILS(BOOK_ID),
+FOREIGN KEY(FINE_RANGE) References STAR_FINE_DETAILS(FINE_RANGE)
+);
+ 
+CREATE TABLE supplier_orders (
+    order_id INT PRIMARY KEY AUTO_INCREMENT,
+    supplier_id varchar(5),
+    delivery_status VARCHAR(20) NOT NULL, 
+    quality_score DECIMAL(20, 2), 
+    cost_of_goods DECIMAL(30, 2),
+    CONSTRAINT fk_supplier_id FOREIGN KEY (supplier_id) REFERENCES star_suppliers_details(supplier_id)
+);
+ SHOW TABLES;
+
+KPI's for the Library Management System 
+
+
+-- KPI 1: Books Issued per Month
+CREATE VIEW BooksIssuedPerMonth AS
+SELECT 
+    DATE_FORMAT(DATE_ISSUE, '%Y-%m') AS Month,
+    COUNT(*) AS BooksIssued
+FROM 
+    STAR_BOOK_ISSUE
+GROUP BY 
+    DATE_FORMAT(DATE_ISSUE, '%Y-%m');
+
+-- KPI 2: Books Returned on Time
+CREATE VIEW BooksReturnedOnTime AS
+SELECT 
+    COUNT(*) AS TotalBooksIssued,
+    SUM(CASE WHEN DATE_RETURNED <= DATE_RETURN THEN 1 ELSE 0 END) AS BooksReturnedOnTime,
+    SUM(CASE WHEN DATE_RETURNED <= DATE_RETURN THEN 1 ELSE 0 END) / COUNT(*) * 100 AS PercentageReturnedOnTime
+FROM 
+    STAR_BOOK_ISSUE;
+
+-- KPI 3: Member Registration Growth
+CREATE VIEW MemberRegistrationGrowth AS
+SELECT 
+    DATE_FORMAT(DATE_REGISTER, '%Y-%m') AS Month,
+    COUNT(*) AS NewRegistrations
+FROM 
+    STAR_MEMBERS
+GROUP BY 
+    DATE_FORMAT(DATE_REGISTER, '%Y-%m');
+
+-- KPI 4: Book Availability
+CREATE VIEW BookAvailability AS
+SELECT 
+    SUM(AVAILABLE_BOOK) AS AvailableBooks,
+    SUM(TOTAL_COPIES) AS TotalBooks,
+    SUM(AVAILABLE_BOOK) / SUM(TOTAL_COPIES) * 100 AS PercentageAvailable
+FROM 
+    STAR_BOOK_DETAILS;
+
+-- KPI 5: Supplier Performance
+CREATE VIEW SupplierPerformance AS
+SELECT 
+    S.SUPPLIER_ID,
+    S.SUPPLIER_NAME,
+    AVG(O.quality_score) AS AverageQualityScore,
+    SUM(CASE WHEN O.delivery_status = 'On Time' THEN 1 ELSE 0 END) / COUNT(*) * 100 AS OnTimeDeliveryRate
+FROM 
+    STAR_SUPPLIERS_DETAILS S
+JOIN 
+    supplier_orders O ON S.SUPPLIER_ID = O.supplier_id
+GROUP BY 
+    S.SUPPLIER_ID, S.SUPPLIER_NAME;
+
+-- KPI 6: Fine Collection
+CREATE VIEW FineCollection AS
+SELECT 
+    SUM(F.FINE_AMOUNT) AS TotalFinesCollected
+FROM 
+    STAR_BOOK_ISSUE I
+JOIN 
+    STAR_FINE_DETAILS F ON I.FINE_RANGE = F.FINE_RANGE
+WHERE 
+    I.DATE_RETURNED > I.DATE_RETURN;
+
+-- KPI 7: Most Popular Books
+CREATE VIEW MostPopularBooks AS
+SELECT 
+    B.BOOK_ID,
+    B.BOOK_TITLE,
+    COUNT(I.BOOK_ID) AS TimesIssued
+FROM 
+    STAR_BOOK_DETAILS B
+JOIN 
+    STAR_BOOK_ISSUE I ON B.BOOK_ID = I.BOOK_ID
+GROUP BY 
+    B.BOOK_ID, B.BOOK_TITLE
+ORDER BY 
+    TimesIssued DESC;
+
+-- KPI 8: Average Book Cost
+CREATE VIEW AverageBookCost AS
+SELECT 
+    AVG(PRICE) AS AverageCostPerBook
+FROM 
+    STAR_BOOK_DETAILS;
+
+-- KPI 9: Book Damage Rate
+CREATE VIEW BookDamageRate AS
+SELECT 
+    COUNT(*) AS TotalBooks,
+    SUM(CASE WHEN D.QUALITY_SCORE < 2 THEN 1 ELSE 0 END) AS DamagedBooks,
+    SUM(CASE WHEN D.QUALITY_SCORE < 2 THEN 1 ELSE 0 END) / COUNT(*) * 100 AS DamageRate
+FROM 
+    STAR_BOOK_DETAILS D;
+
+-- KPI 10: Inventory Turnover
+CREATE VIEW InventoryTurnover AS
+SELECT 
+    COUNT(DISTINCT BOOK_ID) AS UniqueBooksIssued,
+    SUM(TIMESTAMPDIFF(DAY, DATE_ISSUE, DATE_RETURNED)) / COUNT(DISTINCT BOOK_ID) AS AverageDaysIssued
+FROM 
+    STAR_BOOK_ISSUE
+WHERE 
+    DATE_RETURNED IS NOT NULL;
+
+-- To display the views
+SHOW TABLES;
